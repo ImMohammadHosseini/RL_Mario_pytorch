@@ -1,0 +1,4 @@
+﻿Numpy
+torch
+gym
+matplotlib
