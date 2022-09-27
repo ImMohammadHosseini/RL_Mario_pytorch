@@ -142,22 +142,22 @@ class Mario:
             self.net = self.net.to(device="cuda")
 
         self.exploration_rate = 1
-        self.exploration_rate_decay = 0.99999975
+        self.exploration_rate_decay = 0.9999975
         self.exploration_rate_min = 0.1
         self.curr_step = 0
 
-        self.save_every = 5e5  # no. of experiences between saving Mario Net
+        self.save_every = 2e3  # no. of experiences between saving Mario Net
         
         self.memory = deque(maxlen=100000)
         self.batch_size = 32
         self.gamma = 0.9
 
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=0.0025)
         self.loss_fn = torch.nn.SmoothL1Loss()
 
-        self.burnin = 1e4  
+        self.burnin = 1e3 
         self.learn_every = 3  
-        self.sync_every = 1e4 
+        self.sync_every = 1e4
 
     def act(self, state):
         
@@ -237,10 +237,12 @@ class Mario:
         
     def save(self):
         save_path = (
-            self.save_dir / f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
+            self.save_dir / 
+            f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
         )
         torch.save(
-            dict(model=self.net.state_dict(), exploration_rate=self.exploration_rate),
+            dict(model=self.net.state_dict(), 
+                 exploration_rate=self.exploration_rate),
             save_path,
         )
         print(f"MarioNet saved to {save_path} at step {self.curr_step}")
@@ -391,14 +393,16 @@ if __name__ == "__main__":
     env = ResizeObservation(env, shape=84)
     env = FrameStack(env, num_stack=4)
 
-    save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    save_dir = Path("checkpoints") / datetime.datetime.now().strftime(
+        "%Y-%m-%dT%H-%M-%S")
     save_dir.mkdir(parents=True)
 
-    mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)
+    mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, 
+                  save_dir=save_dir)
 
     logger = MetricLogger(save_dir)
 
-    episodes = 25
+    episodes = 90
     for e in range(episodes):
 
         state = env.reset()
@@ -431,4 +435,5 @@ if __name__ == "__main__":
         logger.log_episode()
 
         if e % 5 == 0:
-            logger.record(episode=e, epsilon=mario.exploration_rate, step=mario.curr_step)
+            logger.record(episode=e, epsilon=mario.exploration_rate, 
+                          step=mario.curr_step)
