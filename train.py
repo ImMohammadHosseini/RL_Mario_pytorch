@@ -30,13 +30,6 @@ import time, datetime
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
-env = JoypadSpace(env, [["right"], ["right", "A"]])
-
-env.reset()
-next_state, reward, done, info = env.step(action=0)
-print(f"{next_state.shape},\n {reward},\n {done},\n {info}")
-
 
 class SkipFrame(gym.Wrapper):
     def __init__(self, env, skip):
@@ -97,10 +90,7 @@ class ResizeObservation(gym.ObservationWrapper):
         return observation
 
 
-env = SkipFrame(env, skip=4)
-env = GrayScaleObservation(env)
-env = ResizeObservation(env, shape=84)
-env = FrameStack(env, num_stack=4)
+
 
 class MarioNet(nn.Module):
 
@@ -384,48 +374,61 @@ class MetricLogger:
             plt.clf()
             
             
-use_cuda = torch.cuda.is_available()
-print(f"Using CUDA: {use_cuda}")
-print()
+if __name__ == "__main__":   
+    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
+    env = JoypadSpace(env, [["right"], ["right", "A"]])
 
-save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-save_dir.mkdir(parents=True)
+    env.reset()
+    next_state, reward, done, info = env.step(action=0)
+    print(f"{next_state.shape},\n {reward},\n {done},\n {info}")
 
-mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)
+    use_cuda = torch.cuda.is_available()
+    print(f"Using CUDA: {use_cuda}")
+    print()
 
-logger = MetricLogger(save_dir)
+    env = SkipFrame(env, skip=4)
+    env = GrayScaleObservation(env)
+    env = ResizeObservation(env, shape=84)
+    env = FrameStack(env, num_stack=4)
 
-episodes = 10
-for e in range(episodes):
+    save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    save_dir.mkdir(parents=True)
 
-    state = env.reset()
+    mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)
 
-    # Play the game!
-    while True:
+    logger = MetricLogger(save_dir)
 
-        # Run agent on the state
-        action = mario.act(state)
+    episodes = 25
+    for e in range(episodes):
 
-        # Agent performs action
-        next_state, reward, done, info = env.step(action)
+        state = env.reset()
 
-        # Remember
-        mario.cache(state, next_state, action, reward, done)
+        # Play the game!
+        while True:
 
-        # Learn
-        q, loss = mario.learn()
+            # Run agent on the state
+            action = mario.act(state)
 
-        # Logging
-        logger.log_step(reward, loss, q)
+            # Agent performs action
+            next_state, reward, done, info = env.step(action)
 
-        # Update state
-        state = next_state
+            # Remember
+            mario.cache(state, next_state, action, reward, done)
 
-        # Check if end of game
-        if done or info["flag_get"]:
-            break
+            # Learn
+            q, loss = mario.learn()
 
-    logger.log_episode()
+            # Logging
+            logger.log_step(reward, loss, q)
 
-    if e % 20 == 0:
-        logger.record(episode=e, epsilon=mario.exploration_rate, step=mario.curr_step)
+            # Update state
+            state = next_state
+
+            # Check if end of game
+            if done or info["flag_get"]:
+                break
+
+        logger.log_episode()
+
+        if e % 5 == 0:
+            logger.record(episode=e, epsilon=mario.exploration_rate, step=mario.curr_step)
