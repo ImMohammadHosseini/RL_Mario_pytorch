@@ -127,8 +127,58 @@ class MarioNet(nn.Module):
             return self.online(input)
         elif model == "target":
             return self.target(input)
-        
+ 
 
+class MarioNet1(nn.Module):
+
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        c, h, w = input_dim
+
+        if h != 84:
+            raise ValueError(f"Expecting input height: 84, got: {h}")
+        if w != 84:
+            raise ValueError(f"Expecting input width: 84, got: {w}")
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(c, 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
+
+        conv_out_size = self._get_conv_out(input_dim)
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim)
+        )
+
+        self.target_conv = copy.deepcopy(self.conv)
+        self.target_fc = copy.deepcopy(self.fc)
+        # Q_target parameters are frozen.
+        for p in self.target_conv.parameters():
+            p.requires_grad = False
+
+        for p in self.target_fc.parameters():
+            p.requires_grad = False
+            
+    def _get_conv_out(self, shape):
+        o = self.conv(torch.zeros(1, *shape))
+        return int(np.prod(o.size()))
+
+    def forward(self, input, model):
+        if model == "online":
+            conv_out = self.conv(input).view(input.size()[0], -1)
+            return self.fc(conv_out)
+        elif model == "target":
+            conv_out = self.target_conv(input).view(input.size()[0], -1)
+            return self.target_fc(conv_out)
+        
+        
+        
 class Mario:
     def __init__(self, state_dim, action_dim, save_dir):
         self.state_dim = state_dim
@@ -142,20 +192,20 @@ class Mario:
             self.net = self.net.to(device="cuda")
 
         self.exploration_rate = 1
-        self.exploration_rate_decay = 0.9999975
+        self.exploration_rate_decay = 0.99999975
         self.exploration_rate_min = 0.1
         self.curr_step = 0
 
-        self.save_every = 2e3  # no. of experiences between saving Mario Net
+        self.save_every = 5e5  # no. of experiences between saving Mario Net
         
-        self.memory = deque(maxlen=100000)
+        self.memory = deque(maxlen=15000)
         self.batch_size = 32
         self.gamma = 0.9
 
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=0.0025)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
         self.loss_fn = torch.nn.SmoothL1Loss()
 
-        self.burnin = 1e3 
+        self.burnin = 1e4 
         self.learn_every = 3  
         self.sync_every = 1e4
 
@@ -234,7 +284,8 @@ class Mario:
 
     def sync_Q_target(self):
         self.net.target.load_state_dict(self.net.online.state_dict())
-        
+        #self.net.target_conv.load_state_dict(self.net.conv.state_dict())
+        #self.net.target_fc.load_state_dict(self.net.fc.state_dict())
     def save(self):
         save_path = (
             self.save_dir / 
@@ -402,7 +453,7 @@ if __name__ == "__main__":
 
     logger = MetricLogger(save_dir)
 
-    episodes = 90
+    episodes = 10000
     for e in range(episodes):
 
         state = env.reset()
@@ -434,6 +485,6 @@ if __name__ == "__main__":
 
         logger.log_episode()
 
-        if e % 5 == 0:
+        if e % 200 == 0:
             logger.record(episode=e, epsilon=mario.exploration_rate, 
                           step=mario.curr_step)
