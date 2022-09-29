@@ -15,6 +15,7 @@ from pathlib import Path
 import torch
 from matplotlib import animation
 import matplotlib.pyplot as plt
+import subprocess as sp
 
 class Mario_test:
     def __init__(self, state_dim, action_dim, trained_model_dir):
@@ -45,8 +46,23 @@ class Mario_test:
         self.curr_step += 1
         return action_idx
     
+class Monitor:
+    def __init__(self, width, height, saved_path):
+
+        self.command = ["ffmpeg", "-y", "-f", "rawvideo", "-vcodec", "rawvideo", 
+                        "-s", "{}X{}".format(width, height),
+                        "-pix_fmt", "rgb24", "-r", "80", "-i", "-", "-an", 
+                        "-vcodec", "mpeg4", saved_path]
+        try:
+            self.pipe = sp.Popen(self.command, stdin=sp.PIPE, stderr=sp.PIPE)
+        except FileNotFoundError:
+            pass
+
+    def record(self, image_array):
+        self.pipe.stdin.write(image_array.__array__())
+
     
-def save_frames_as_gif(frames, path='./', filename='mario_test.mp4'):
+def save_frames_as_gif(frames, path='./', filename='mario_test.gif'):
 
     #Mess with this to change frame size
     plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), 
@@ -72,9 +88,11 @@ if __name__ == "__main__":
                   trained_model_dir=trained_model_dir)
     
     state = env.reset()
+    monitor = Monitor(256, 240, Path("gif", "mario_test.mp4"))
     frames = []
     while True:
         action = mario.act(state)
+        monitor.record(state)
         next_state, reward, done, info = env.step(action)
         state = next_state
         #env.render()
@@ -83,5 +101,5 @@ if __name__ == "__main__":
         if done or info["flag_get"]:
             break
         
-    save_frames_as_gif(frames, path='./gif/')        
+    #save_frames_as_gif(frames, path='./gif/')        
         
