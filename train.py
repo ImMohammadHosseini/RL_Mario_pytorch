@@ -27,10 +27,11 @@ import random, datetime, os, copy
 from pathlib import Path
 
 
-class Mario:
-    def __init__(self, state_dim, action_dim, save_dir):
+class Mario_train:
+    def __init__(self, state_dim, action_dim, log_dir, save_dir):
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.log_dir = log_dir
         self.save_dir = save_dir
 
         self.use_cuda = torch.cuda.is_available()
@@ -135,7 +136,7 @@ class Mario:
         #self.net.target_conv.load_state_dict(self.net.conv.state_dict())
         #self.net.target_fc.load_state_dict(self.net.fc.state_dict())
     def save(self):
-        save_path = (
+        '''save_path = (
             self.save_dir / 
             f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
         )
@@ -143,15 +144,18 @@ class Mario:
             dict(model=self.net.state_dict(), 
                  exploration_rate=self.exploration_rate),
             save_path,
-        )
-        print(f"MarioNet saved to {save_path} at step {self.curr_step}")
+        )'''
+        #save_path = self.save_dir #+ "/mario_net.pt"
+        torch.save(self.net.state_dict(), self.save_dir)
+        print(f"MarioNet saved to {self.save_dir} at step {self.curr_step}")
     
     def learn(self):
         if self.curr_step % self.sync_every == 0:
             self.sync_Q_target()
 
         if self.curr_step % self.save_every == 0:
-            self.save()
+            #self.save()
+            pass
 
         if self.curr_step < self.burnin:
             return None, None
@@ -187,16 +191,19 @@ if __name__ == "__main__":
     print()
 
 
-    save_dir = Path("checkpoints") / datetime.datetime.now().strftime(
+    log_dir = Path("checkpoints") / datetime.datetime.now().strftime(
         "%Y-%m-%dT%H-%M-%S")
-    save_dir.mkdir(parents=True)
+    log_dir.mkdir(parents=True)
+    
+    save_dir = Path("trained_model", "mario_net.pt") 
+    #save_dir.mkdir(parents=True)
 
-    mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, 
-                  save_dir=save_dir)
+    mario = Mario_train(state_dim=(4, 84, 84), action_dim=env.action_space.n, 
+                  log_dir=log_dir, save_dir=save_dir)
 
-    logger = MetricLogger(save_dir)
+    logger = MetricLogger(log_dir)
 
-    episodes = 10000
+    episodes = 1000
     for e in range(episodes):
 
         state = env.reset()
@@ -231,3 +238,5 @@ if __name__ == "__main__":
         if e % 200 == 0:
             logger.record(episode=e, epsilon=mario.exploration_rate, 
                           step=mario.curr_step)
+    
+    mario.save()
