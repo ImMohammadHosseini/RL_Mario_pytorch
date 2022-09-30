@@ -16,6 +16,8 @@ import torch
 from matplotlib import animation
 import matplotlib.pyplot as plt
 import subprocess as sp
+from IPython import display
+
 
 class Mario_test:
     def __init__(self, state_dim, action_dim, trained_model_dir):
@@ -46,7 +48,7 @@ class Mario_test:
         self.curr_step += 1
         return action_idx
     
-class Monitor:
+'''class Monitor:
     def __init__(self, width, height, saved_path):
 
         self.command = ["ffmpeg", "-y", "-f", "rawvideo", "-vcodec", "rawvideo", 
@@ -59,10 +61,10 @@ class Monitor:
             pass
 
     def record(self, image_array):
-        self.pipe.stdin.write(image_array.__array__())
+        self.pipe.stdin.write(image_array.__array__())'''
 
     
-def save_frames_as_gif(frames, path='./', filename='mario_test.gif'):
+'''def save_frames_as_gif(frames, path='./', filename='mario_test.mp4'):
 
     #Mess with this to change frame size
     plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), 
@@ -76,7 +78,7 @@ def save_frames_as_gif(frames, path='./', filename='mario_test.gif'):
 
     anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), 
                                    interval=50)
-    anim.save(path + filename, writer='imagemagick', fps=60)
+    anim.save(path + filename, writer='imagemagick', fps=60)'''
 
 
 if __name__ == "__main__":
@@ -88,16 +90,18 @@ if __name__ == "__main__":
                   trained_model_dir=trained_model_dir)
     
     state = env.reset()
-    monitor = Monitor(256, 240, Path("gif", "mario_test.mp4"))
+    #monitor = Monitor(256, 240, Path("gif", "mario_test.mp4"))
     frames = []
     while True:
+        #frames.append(env.render(mode="rgb_array"))
+        plt.imshow(env.render(mode='rgb_array'))
+        display.display(plt.gcf())
+        display.clear_output(wait=True)
         action = mario.act(state)
-        monitor.record(state)
+        #monitor.record(state)
         next_state, reward, done, info = env.step(action)
         state = next_state
-        #env.render()
-        frames.append(env.render(mode="rgb_array"))
-        #plt.imshow(frames[-1])
+        #frames.append(env.render(mode="rgb_array"))
         if done or info["flag_get"]:
             break
         
